@@ -1,0 +1,859 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { BookOpen, Calendar, CheckCircle2, ChevronRight, FileText, Home, LogOut, Scissors, User, XCircle, Award, Loader2, Download, Sparkles, BrainCircuit, Target, ArrowRight, RefreshCw, BarChart3, ClipboardList, DollarSign, Clock, Briefcase, GraduationCap, AlertCircle } from 'lucide-react';
+
+// --- CONFIGURAÇÃO DA API GEMINI ---
+const apiKey = "AQ.Ab8RN6Jvv_pC9jELOL0rKrG8bsheGWWM9z05rgY9V7Bn8YtpJw"; 
+
+// --- DADOS SIMULADOS DO ALUNO E EDITAL ---
+const mockUser = {
+  name: "Futuro(a) Servidor(a)",
+  cargo: "Professor de Educação Física",
+  municipio: "Prefeitura Municipal de Assunção/PB",
+  banca: "Ápice Consultoria",
+  progress: 1.2
+};
+
+// Cronograma mapeando a SEQUÊNCIA EXATA do Edital (Anexo I)
+// Mantendo a lógica de pesos: Seg/Qua (Específicos), Ter/Qui (Português), Sex (Info/Legislação)
+const cronograma = [
+  // SEMANA 1
+  { day: 1, date: '01 de Junho de 2026', name: 'Segunda-feira', theme: 'Conhecimentos Pedagógicos', subject: '1. Educação. sociedade e estado.', status: 'pending', progress: 1.2 },
+  { day: 2, date: '02 de Junho de 2026', name: 'Terça-feira', theme: 'Português', subject: '1. Leitura e interpretação textual.', status: 'locked', progress: 2.4 },
+  { day: 3, date: '03 de Junho de 2026', name: 'Quarta-feira', theme: 'Conhecimentos Específicos (Ed. Física)', subject: '1. Aspectos históricos e legais da Educação Física e do Esporte no Brasil.', status: 'locked', progress: 3.6 },
+  { day: 4, date: '04 de Junho de 2026', name: 'Quinta-feira', theme: 'Português', subject: '2. Gêneros textuais/discursivos: estrutura composicional, conteúdo e estilo.', status: 'locked', progress: 4.8 },
+  { day: 5, date: '05 de Junho de 2026', name: 'Sexta-feira', theme: 'Informática', subject: '1. Noções de sistemas operacionais (Windows 10/11 e Linux).', status: 'locked', progress: 6.0 },
+  { day: 6, date: '06 de Junho de 2026', name: 'Sábado', theme: 'Revisão da Semana 1', subject: 'Revisão Ativa e Flashcards', status: 'locked', type: 'revision', progress: 6.0 },
+  { day: 7, date: '07 de Junho de 2026', name: 'Domingo', theme: 'Simulado Semanal 1', subject: '50 Questões (Padrão Ápice)', status: 'locked', type: 'simulado', progress: 7.2 },
+  
+  // SEMANA 2
+  { day: 8, date: '08 de Junho de 2026', name: 'Segunda-feira', theme: 'Conhecimentos Pedagógicos', subject: '2. Formação docente multidimensional.', status: 'locked', progress: 8.4 },
+  { day: 9, date: '09 de Junho de 2026', name: 'Terça-feira', theme: 'Português', subject: '3. Tipologias/sequências textuais: dissertativa, argumentativa, descritiva...', status: 'locked', progress: 9.6 },
+  { day: 10, date: '10 de Junho de 2026', name: 'Quarta-feira', theme: 'Conhecimentos Específicos (Ed. Física)', subject: '2. Referenciais curriculares e organização da Educação Física escolar.', status: 'locked', progress: 10.8 },
+  { day: 11, date: '11 de Junho de 2026', name: 'Quinta-feira', theme: 'Português', subject: '4. Elementos/fatores de textualidade: coesão, coerência, intertextualidade.', status: 'locked', progress: 12.0 },
+  { day: 12, date: '12 de Junho de 2026', name: 'Sexta-feira', theme: 'Legislação do Município', subject: '1. Lei Orgânica municipal de 19 de julho de 1997.', status: 'locked', progress: 13.2 },
+  { day: 13, date: '13 de Junho de 2026', name: 'Sábado', theme: 'Revisão da Semana 2', subject: 'Revisão Ativa e Flashcards', status: 'locked', type: 'revision', progress: 13.2 },
+  { day: 14, date: '14 de Junho de 2026', name: 'Domingo', theme: 'Simulado Semanal 2', subject: '50 Questões (Padrão Ápice)', status: 'locked', type: 'simulado', progress: 14.4 },
+];
+
+// --- DADOS DO RAIO-X DO EDITAL ---
+const mockRaioX = {
+  cargo: "Professor - Educação Física",
+  vagas: "01 (Ampla Concorrência)",
+  remuneracao: "R$ 4.438,64",
+  cargaHoraria: "30h semanais",
+  requisitos: "Licenciatura em Educação Física.",
+  banca: "Ápice Consultoria",
+  fases: "1ª Etapa: Prova Objetiva | 2ª Etapa: Prova de Títulos",
+  datas: [
+    { evento: "Período de Inscrições", data: "01 a 30 de Junho de 2026" },
+    { evento: "Data Limite para Pagamento", data: "10 de Julho de 2026" },
+    { evento: "Aplicação da Prova Objetiva", data: "30 de Agosto de 2026" },
+    { evento: "Envio de Títulos", data: "07 de Outubro de 2026" },
+    { evento: "Resultado Final", data: "30 de Novembro de 2026" }
+  ],
+  prova: [
+    { disciplina: "Português", questoes: 20, peso: 2, total: 40 },
+    { disciplina: "Informática", questoes: 5, peso: 1, total: 5 },
+    { disciplina: "Conhec. sobre o Município", questoes: 10, peso: 1, total: 10 },
+    { disciplina: "Conhec. Específicos/Pedagógicos", questoes: 15, peso: 3, total: 45 }
+  ],
+  atribuições: "Participar da elaboração e avaliação da proposta pedagógica e do Regimento Interno. Elaborar e cumprir plano de trabalho. Colaborar na organização de atividades educacionais de caráter cívico, cultural e recreativo, zelando pela aprendizagem dos alunos."
+};
+
+export default function App() {
+  const [view, setView] = useState('login'); 
+  const [activeTab, setActiveTab] = useState('cronograma'); // NOVO ESTADO DAS ABAS
+  const [activeLesson, setActiveLesson] = useState(null);
+  const [lessonData, setLessonData] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  const [userAnswers, setUserAnswers] = useState({});
+  const [diagnostic, setDiagnostic] = useState(null);
+  const [isGeneratingDiagnostic, setIsGeneratingDiagnostic] = useState(false);
+
+  const topRef = useRef(null);
+
+  const handleLogin = (e) => {
+    e.preventDefault();
+    setView('dashboard');
+  };
+
+  const openLesson = async (lesson) => {
+    if (lesson.type === 'revision' || lesson.type === 'simulado') {
+        alert("Módulo de revisão/simulado em desenvolvimento.");
+        return;
+    }
+    setActiveLesson(lesson);
+    setView('lesson');
+    generateLessonContent(lesson);
+    if(topRef.current) topRef.current.scrollIntoView();
+  };
+
+  const generateLessonContent = async (lesson) => {
+    if (!apiKey || apiKey.trim() === "") {
+        setLessonData({ error: "API_KEY_MISSING" });
+        return;
+    }
+
+    setIsLoading(true);
+    setLessonData(null);
+    setUserAnswers({});
+    setDiagnostic(null);
+
+    const randomSeed = Math.floor(Math.random() * 1000000);
+
+    const systemPrompt = `Você é um Professor Particular e Mentor Estratégico especialista em concursos públicos, com didática de excelência.
+    Seu objetivo é preparar o aluno para o concurso da ${mockUser.municipio} (Cargo: ${mockUser.cargo}, Banca: ${mockUser.banca}).
+    
+    DATA E TEMA DE ESTUDO: ${lesson.date} - ${lesson.theme} - ${lesson.subject}
+    
+    DIRETRIZ CRÍTICA DE VARIEDADE (Sessão: ${randomSeed}): 
+    Crie uma abordagem INÉDITA. Explore ângulos, leis específicas, e subtemas que fogem do lugar comum.
+    
+    DIRETRIZ DE DESTAQUE VISUAL (MUITO IMPORTANTE):
+    Você DEVE colocar em evidência as palavras-chave, conceitos centrais, prazos, leis e frases de maior relevância dentro do texto teórico. 
+    Para isso, envolva os termos essenciais obrigatoriamente com a tag HTML <mark> (exemplo: <mark>palavra-chave</mark>). Use este recurso generosamente para criar um efeito de "marca-texto" que facilite a leitura dinâmica do aluno.
+
+    Diretrizes de Conteúdo:
+    1. cantoDoSaber: Aja como em uma aula magna. O texto DEVE SER MUITO APROFUNDADO e rico em detalhes. Use HTML (<h3>, <h4>, <p>, <ul>, <li>, <strong>, <mark>).
+    2. cofreDePerolas: 4 a 6 tópicos curtos apontando pegadinhas recorrentes da banca ${mockUser.banca}.
+    3. questoes: Gere EXATAMENTE 15 questões de múltipla escolha (A a E) INÉDITAS da banca ${mockUser.banca}. (ID 1-5: Fáceis, ID 6-10: Médias, ID 11-15: Difíceis). Explicações do gabarito devem ser detalhadas.`;
+
+    const jsonSchema = {
+        type: "OBJECT",
+        properties: {
+            "cantoDoSaber": { "type": "STRING" },
+            "cofreDePerolas": {
+                "type": "ARRAY",
+                "items": { "type": "STRING" }
+            },
+            "questoes": {
+                "type": "ARRAY",
+                "items": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "id": { "type": "INTEGER" },
+                        "nivel": { "type": "STRING" },
+                        "enunciado": { "type": "STRING" },
+                        "opcoes": {
+                            "type": "ARRAY",
+                            "items": {
+                                "type": "OBJECT",
+                                "properties": {
+                                    "letra": { "type": "STRING" },
+                                    "texto": { "type": "STRING" },
+                                    "correta": { "type": "BOOLEAN" }
+                                }
+                            }
+                        },
+                        "explicacao": { "type": "STRING" }
+                    }
+                }
+            }
+        },
+        required: ["cantoDoSaber", "cofreDePerolas", "questoes"]
+    };
+
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: `Gere a aula sobre ${lesson.subject} e as 15 questões inéditas.` }] }],
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            generationConfig: { 
+                responseMimeType: "application/json",
+                responseSchema: jsonSchema,
+                temperature: 0.95,
+                maxOutputTokens: 8192
+            }
+          }),
+        }
+      );
+
+      const data = await response.json();
+      
+      if (!response.ok) throw new Error(`Erro da API: ${data.error?.message || "Falha na comunicação."}`);
+
+      if (data.candidates && data.candidates[0].content.parts[0].text) {
+        const rawText = data.candidates[0].content.parts[0].text;
+        const cleanedText = rawText.replace(/^```json/im, '').replace(/```$/im, '').trim();
+        
+        try {
+            const generatedJSON = JSON.parse(cleanedText);
+            setLessonData(generatedJSON);
+        } catch (parseError) {
+            console.error("Erro ao converter JSON:", parseError, cleanedText);
+            throw new Error("A IA gerou um formato inválido. Tente novamente.");
+        }
+      } else {
+        throw new Error("A API não retornou nenhum conteúdo válido.");
+      }
+    } catch (error) {
+      console.error("Erro ao gerar aula:", error);
+      setLessonData({ error: "API_ERROR", errorMessage: error.message });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGenerateDiagnostic = async () => {
+    setIsGeneratingDiagnostic(true);
+
+    const answeredCount = Object.keys(userAnswers).length;
+    const correctCount = Object.values(userAnswers).filter(a => a.isCorrect).length;
+    
+    const performanceReport = lessonData.questoes.map(q => ({
+       id: q.id,
+       nivel: q.nivel,
+       tema: q.enunciado.substring(0, 50) + "...",
+       acertou: userAnswers[q.id]?.isCorrect || false
+    }));
+
+    const diagnosticPrompt = `O aluno finalizou 15 questões sobre "${activeLesson.subject}" para o concurso da ${mockUser.municipio}. Banca: ${mockUser.banca}.
+    Acertos: ${correctCount} de ${answeredCount}.
+    
+    Relatório: ${JSON.stringify(performanceReport)}
+
+    Faça um diagnóstico direto e encorajador:
+    1. Aponte PONTOS FORTES (o que ele acertou/dominou).
+    2. Aponte PONTOS FRACOS (o que errou, com dicas do que revisar, citando os níveis de dificuldade).
+    3. Conclua OBRIGATORIAMENTE com uma FRASE MOTIVACIONAL ÚNICA E IMPACTANTE sobre persistência, estudo e aprovação, para gerar muito ânimo.
+    
+    Retorne em HTML estruturado (<h4>, <p>, <ul>, <li>). A frase motivacional DEVE estar dentro de uma tag <blockquote>. NÃO use markdown.`;
+
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contents: [{ parts: [{ text: diagnosticPrompt }] }] }),
+        }
+      );
+
+      const data = await response.json();
+      if (data.candidates && data.candidates[0].content.parts[0].text) {
+        setDiagnostic(data.candidates[0].content.parts[0].text);
+      }
+    } catch (error) {
+      setDiagnostic("<p>Diagnóstico indisponível no momento.</p>");
+    } finally {
+      setIsGeneratingDiagnostic(false);
+    }
+  };
+
+  const handleAnswerQuestion = (questionId, isCorrect, letra) => {
+     setUserAnswers(prev => ({ ...prev, [questionId]: { isCorrect, letra } }));
+  };
+
+  const answeredCount = Object.keys(userAnswers).length;
+  const correctCount = Object.values(userAnswers).filter(a => a.isCorrect).length;
+  const totalQuestions = lessonData?.questoes?.length || 0;
+  const allAnswered = totalQuestions > 0 && answeredCount === totalQuestions;
+
+  if (view === 'login') {
+    return (
+      <div className="min-h-screen bg-slate-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
+        <div className="sm:mx-auto sm:w-full sm:max-w-md">
+          <div className="flex justify-center text-slate-900 mb-4">
+            <Target size={56} strokeWidth={1.5} />
+          </div>
+          <h2 className="mt-6 text-center text-4xl font-extrabold text-slate-900 tracking-tight">Mentoria Prime</h2>
+          <p className="mt-2 text-center text-base text-slate-600">Acesso restrito a mentorados.</p>
+        </div>
+
+        <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+          <div className="bg-white py-10 px-6 shadow-xl sm:rounded-2xl sm:px-10 border border-slate-200">
+            <form className="space-y-6" onSubmit={handleLogin}>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700">Email de Acesso</label>
+                <div className="mt-2">
+                  <input type="text" defaultValue="aluno@mentoria.com" className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm text-slate-900 text-base" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700">Senha</label>
+                <div className="mt-2">
+                  <input type="password" defaultValue="******" className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm text-slate-900 text-base" />
+                </div>
+              </div>
+              <div className="pt-2">
+                <button type="submit" className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-base font-bold text-white bg-slate-900 hover:bg-slate-800 transition-colors">
+                  Entrar na Plataforma
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (view === 'dashboard') {
+    return (
+      <div className="min-h-screen bg-slate-100 pb-20 font-sans">
+        <div className="bg-slate-900 text-white pt-16 pb-12 px-6 shadow-2xl relative overflow-hidden">
+          {}
+          <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 -translate-y-1/2 translate-x-1/2"></div>
+          
+          <div className="flex justify-between items-center mb-8 relative z-10 max-w-4xl mx-auto">
+            <div>
+              <p className="text-slate-400 text-sm font-medium tracking-wide uppercase mb-1">Painel do Aluno</p>
+              <h1 className="text-3xl font-extrabold tracking-tight">{mockUser.name}</h1>
+            </div>
+            <div className="h-14 w-14 bg-white/10 rounded-full flex items-center justify-center backdrop-blur-md cursor-pointer hover:bg-white/20 transition-all border border-white/5" onClick={() => setView('login')}>
+              <LogOut size={24} className="text-slate-300 ml-1" />
+            </div>
+          </div>
+          
+          <div className="bg-slate-800/50 backdrop-blur-xl rounded-2xl p-5 border border-slate-700/50 relative z-10 max-w-4xl mx-auto">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="bg-indigo-500/20 p-2 rounded-lg">
+                <Target className="text-indigo-400" size={24} />
+              </div>
+              <div>
+                <h2 className="font-bold text-lg">{mockUser.cargo}</h2>
+                <p className="text-sm text-slate-400">{mockUser.municipio}</p>
+              </div>
+            </div>
+            <div className="mt-5">
+              <div className="flex justify-between text-sm font-medium mb-2">
+                <span className="text-slate-300">Progresso do Edital</span>
+                <span className="text-emerald-400 font-bold">{mockUser.progress}%</span>
+              </div>
+              <div className="w-full bg-slate-950 rounded-full h-3">
+                <div className="bg-emerald-500 h-3 rounded-full transition-all duration-1000 ease-out" style={{ width: `${mockUser.progress}%` }}></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {}
+        <div className="max-w-4xl mx-auto px-5 -mt-6 relative z-20">
+           <div className="bg-white rounded-2xl p-1.5 shadow-lg border border-slate-200 flex items-center justify-between">
+              <button 
+                 onClick={() => setActiveTab('cronograma')}
+                 className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm sm:text-base flex items-center justify-center gap-2 transition-all duration-300 ${activeTab === 'cronograma' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}
+              >
+                 <Calendar size={20}/> Cronograma Diário
+              </button>
+              <button 
+                 onClick={() => setActiveTab('raiox')}
+                 className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm sm:text-base flex items-center justify-center gap-2 transition-all duration-300 ${activeTab === 'raiox' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}
+              >
+                 <ClipboardList size={20}/> Raio-X do Edital
+              </button>
+           </div>
+        </div>
+
+        <div className="px-5 mt-10 max-w-4xl mx-auto">
+          {activeTab === 'cronograma' ? (
+             <>
+                {}
+                <h3 className="text-xl font-extrabold text-slate-900 mb-6 flex items-center gap-2">
+                  <Target size={24} className="text-indigo-600"/> Rota de Aprovação
+                </h3>
+                
+                <div className="space-y-4">
+                  {cronograma.map((item, idx) => (
+                    <div 
+                      key={idx} 
+                      onClick={() => openLesson(item)}
+                      className={`bg-white rounded-2xl p-5 shadow-sm border-2 flex flex-col sm:flex-row sm:items-center justify-between transition-all duration-200 gap-4 ${item.status === 'pending' ? 'border-indigo-100 cursor-pointer hover:shadow-lg hover:border-indigo-300 hover:-translate-y-1' : 'border-slate-100 opacity-60'}`}
+                    >
+                      <div className="flex items-start gap-5">
+                        <div className={`w-14 h-14 shrink-0 rounded-xl flex items-center justify-center font-black text-xl shadow-inner ${item.status === 'pending' ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-400'}`}>
+                          {item.day}
+                        </div>
+                        <div className="pt-1">
+                          <div className="flex items-center gap-2 mb-1">
+                              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{item.name}</p>
+                              <span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{item.date}</span>
+                          </div>
+                          <p className={`font-extrabold text-lg leading-tight mb-1 ${item.status === 'pending' ? 'text-slate-900' : 'text-slate-600'}`}>{item.theme}</p>
+                          <p className="text-base text-slate-600 line-clamp-1">{item.subject}</p>
+                        </div>
+                      </div>
+                      {item.status === 'pending' ? (
+                        <div className="bg-indigo-50 p-2 rounded-full self-end sm:self-auto shrink-0">
+                          <ChevronRight className="text-indigo-600" size={24}/>
+                        </div>
+                      ) : (
+                        <div className="text-xs font-bold bg-slate-100 text-slate-500 px-3 py-1.5 rounded-lg uppercase tracking-wider self-start sm:self-auto shrink-0">Bloqueado</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+             </>
+          ) : (
+             <>
+                {}
+                <h3 className="text-xl font-extrabold text-slate-900 mb-6 flex items-center gap-2">
+                  <ClipboardList size={24} className="text-indigo-600"/> Análise Estratégica do Cargo
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                   <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-4 hover:shadow-md transition-shadow">
+                      <div className="bg-emerald-50 p-3 rounded-xl"><DollarSign className="text-emerald-600" size={28}/></div>
+                      <div>
+                         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Remuneração Inicial</p>
+                         <p className="text-xl font-black text-slate-900">{mockRaioX.remuneracao}</p>
+                      </div>
+                   </div>
+                   <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-4 hover:shadow-md transition-shadow">
+                      <div className="bg-amber-50 p-3 rounded-xl"><Briefcase className="text-amber-600" size={28}/></div>
+                      <div>
+                         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Vagas Ofertadas</p>
+                         <p className="text-xl font-black text-slate-900">{mockRaioX.vagas}</p>
+                      </div>
+                   </div>
+                   <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-4 hover:shadow-md transition-shadow">
+                      <div className="bg-indigo-50 p-3 rounded-xl"><Clock className="text-indigo-600" size={28}/></div>
+                      <div>
+                         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Carga Horária</p>
+                         <p className="text-xl font-black text-slate-900">{mockRaioX.cargaHoraria}</p>
+                      </div>
+                   </div>
+                   <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-4 hover:shadow-md transition-shadow">
+                      <div className="bg-blue-50 p-3 rounded-xl"><GraduationCap className="text-blue-600" size={28}/></div>
+                      <div>
+                         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Requisito Mínimo</p>
+                         <p className="text-sm font-black text-slate-900">{mockRaioX.requisitos}</p>
+                      </div>
+                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
+                   <div className="lg:col-span-2 space-y-6">
+                      {/* Estrutura da Prova */}
+                      <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200">
+                         <h4 className="text-lg font-black text-slate-900 mb-4 flex items-center gap-2">
+                           <Target className="text-indigo-600"/> Estrutura da Prova ({mockRaioX.banca})
+                         </h4>
+                         <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                               <thead>
+                                  <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider border-b border-slate-200">
+                                     <th className="p-3 font-bold">Disciplina</th>
+                                     <th className="p-3 font-bold text-center">Questões</th>
+                                     <th className="p-3 font-bold text-center">Peso</th>
+                                     <th className="p-3 font-bold text-center">Máx. Pontos</th>
+                                  </tr>
+                               </thead>
+                               <tbody className="divide-y divide-slate-100">
+                                  {mockRaioX.prova.map((item, idx) => (
+                                     <tr key={idx} className="hover:bg-slate-50 transition-colors text-sm font-medium text-slate-700">
+                                        <td className="p-3">{item.disciplina}</td>
+                                        <td className="p-3 text-center">{item.questoes}</td>
+                                        <td className="p-3 text-center">{item.peso}</td>
+                                        <td className="p-3 text-center font-bold text-slate-900">{item.total}</td>
+                                     </tr>
+                                  ))}
+                                  <tr className="bg-indigo-50 text-indigo-900 font-black text-sm border-t-2 border-indigo-200">
+                                     <td className="p-3">TOTAL DA PROVA OBJETIVA</td>
+                                     <td className="p-3 text-center">50</td>
+                                     <td className="p-3 text-center">-</td>
+                                     <td className="p-3 text-center">100</td>
+                                  </tr>
+                               </tbody>
+                            </table>
+                         </div>
+                         <div className="mt-4 p-4 bg-amber-50 rounded-2xl flex gap-3 border border-amber-200 text-sm text-amber-900 font-medium">
+                            <AlertCircle className="shrink-0 text-amber-500 mt-0.5" size={20}/>
+                            <p><strong>Atenção:</strong> Conhecimentos Específicos/Pedagógicos representam <strong className="text-red-600">45% da nota total</strong>. Foco total nesta área e em Português (40%). Ambas formam 85% da sua prova.</p>
+                         </div>
+                      </div>
+
+                      {/* Atribuições */}
+                      <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200">
+                         <h4 className="text-lg font-black text-slate-900 mb-4 flex items-center gap-2">
+                           <FileText className="text-indigo-600"/> Atribuições do Cargo
+                         </h4>
+                         <p className="text-slate-600 leading-relaxed text-sm md:text-base">
+                            {mockRaioX.atribuições}
+                         </p>
+                      </div>
+                   </div>
+
+                   <div className="lg:col-span-1">
+                      {/* Datas */}
+                      <div className="bg-slate-900 rounded-3xl p-6 shadow-xl border border-slate-800 text-white relative overflow-hidden h-full">
+                         <div className="absolute -top-6 -right-6 text-slate-800 opacity-50"><Calendar size={120} strokeWidth={1} /></div>
+                         <h4 className="text-lg font-black mb-8 relative z-10 flex items-center gap-2 text-indigo-400">
+                            Linha do Tempo
+                         </h4>
+                         <div className="space-y-6 relative z-10">
+                            {mockRaioX.datas.map((item, idx) => (
+                               <div key={idx} className="relative pl-5 border-l-2 border-indigo-500/30 pb-2">
+                                  <div className="absolute w-3 h-3 bg-indigo-500 rounded-full -left-[7px] top-1 shadow-[0_0_8px_rgba(99,102,241,0.8)]"></div>
+                                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">{item.evento}</p>
+                                  <p className="font-bold text-slate-50 text-base">{item.data}</p>
+                               </div>
+                            ))}
+                         </div>
+                      </div>
+                   </div>
+                </div>
+             </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col font-sans" ref={topRef}>
+      
+      {/* NOVO CABEÇALHO COMPLETO */}
+      <div className="bg-slate-900 border-b border-slate-800 sticky top-0 z-30 px-4 py-4 flex flex-col md:flex-row items-start md:items-center justify-between shadow-lg gap-4">
+        
+        <div className="flex items-start md:items-center gap-3 md:gap-4 w-full md:w-auto overflow-hidden">
+          <button onClick={() => setView('dashboard')} className="p-2 -ml-2 text-slate-300 hover:bg-slate-800 rounded-full transition-colors shrink-0 mt-1 md:mt-0">
+            <ChevronRight className="rotate-180" size={28} />
+          </button>
+          <div className="text-left flex-1 min-w-0">
+            <p className="text-[11px] md:text-xs font-bold text-indigo-400 uppercase tracking-widest mb-0.5 truncate flex items-center gap-2">
+                <Calendar size={14} className="hidden sm:inline-block"/> {activeLesson.name}, {activeLesson.date}
+            </p>
+            <h1 className="text-sm font-bold text-slate-300 truncate opacity-90">{activeLesson.theme}</h1>
+            <h2 className="text-lg md:text-xl font-black text-white truncate" title={activeLesson.subject}>{activeLesson.subject}</h2>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end border-t border-slate-800 md:border-0 pt-3 md:pt-0">
+          {/* Barra de Progresso do Edital no Cabeçalho */}
+          <div className="flex flex-col items-start md:items-end mr-2">
+             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1">
+                 <BarChart3 size={12}/> Edital Batido
+             </span>
+             <div className="flex items-center gap-2">
+                <div className="w-24 md:w-32 h-2 bg-slate-950 rounded-full overflow-hidden shadow-inner border border-slate-800">
+                    <div className="h-full bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)] transition-all duration-1000" style={{ width: `${activeLesson.progress}%` }}></div>
+                </div>
+                <span className="text-xs font-black text-emerald-400">{activeLesson.progress}%</span>
+             </div>
+          </div>
+
+          <button 
+             onClick={() => generateLessonContent(activeLesson)} 
+             className="p-2.5 bg-slate-800 hover:bg-indigo-600 text-indigo-300 hover:text-white rounded-full transition-all shadow-inner border border-slate-700 hover:border-indigo-500 flex-shrink-0"
+             title="Gerar Nova Aula (Conteúdo Inédito)"
+          >
+             <RefreshCw size={20} className={isLoading ? "animate-spin" : ""} />
+          </button>
+          
+          {lessonData && !lessonData.error && (
+             <div className="bg-slate-800 border border-slate-700 px-3 py-2 rounded-xl text-sm font-black text-white shadow-inner flex items-center gap-1.5 flex-shrink-0">
+               <Target size={16} className="text-indigo-400"/>
+               {correctCount}/{totalQuestions}
+             </div>
+          )}
+        </div>
+      </div>
+
+      {lessonData?.error === "API_KEY_MISSING" ? (
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white">
+          <div className="bg-rose-100 p-6 rounded-full mb-6 shadow-lg border-4 border-rose-50"><XCircle className="text-rose-600" size={64} /></div>
+          <h2 className="text-4xl font-black text-slate-900 mb-4 tracking-tight">Chave de API Ausente</h2>
+          <p className="text-xl text-slate-600 max-w-2xl leading-relaxed">Insira sua <strong>Chave do Gemini</strong> no código-fonte.</p>
+          <button onClick={() => setView('dashboard')} className="mt-8 text-slate-500 font-bold hover:text-slate-800 underline">Voltar</button>
+        </div>
+      ) : lessonData?.error === "API_ERROR" ? (
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white">
+          <div className="bg-rose-100 p-6 rounded-full mb-6 shadow-lg border-4 border-rose-50"><XCircle className="text-rose-600" size={64} /></div>
+          <h2 className="text-4xl font-black text-slate-900 mb-4 tracking-tight">Falha na Geração da Aula</h2>
+          <div className="bg-slate-100 p-4 rounded-xl text-left max-w-xl w-full border border-slate-200 mb-6">
+             <p className="font-mono text-sm text-slate-700"><strong>Detalhe Técnico:</strong> {lessonData.errorMessage}</p>
+          </div>
+          <div className="flex gap-4">
+            <button onClick={() => generateLessonContent(activeLesson)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-xl font-bold shadow-md transition-all">Tentar Novamente</button>
+            <button onClick={() => setView('dashboard')} className="bg-white border-2 border-slate-200 text-slate-700 hover:bg-slate-50 px-8 py-4 rounded-xl font-bold transition-all">Voltar</button>
+          </div>
+        </div>
+      ) : isLoading ? (
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white">
+          <div className="relative mb-8">
+            <div className="absolute inset-0 bg-indigo-100 rounded-full animate-ping opacity-75"></div>
+            <div className="relative bg-white p-4 rounded-full shadow-xl border border-slate-100"><BrainCircuit className="animate-pulse text-indigo-600" size={56} /></div>
+          </div>
+          <h2 className="text-3xl font-extrabold text-slate-900 mb-3 tracking-tight">Preparando Aula Magna...</h2>
+          <p className="text-lg text-slate-500 max-w-md">Gerando conteúdo 100% focado no edital de Assunção e estruturando 15 questões inéditas (Banca Ápice).</p>
+        </div>
+      ) : lessonData ? (
+
+        <div className="flex-1 overflow-y-auto p-4 md:p-8 max-w-4xl mx-auto w-full pb-32">
+          
+          <section className="mb-12 bg-white px-6 py-10 md:px-10 rounded-3xl shadow-sm border border-slate-200 relative">
+             <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-500 to-slate-900 rounded-t-3xl"></div>
+             
+             <div className="flex items-center gap-3 mb-8 pb-6 border-b border-slate-100">
+                <div className="bg-indigo-50 p-3 rounded-xl"><BookOpen className="text-indigo-600" size={32} /></div>
+                <div>
+                   <h2 className="text-3xl font-black text-slate-900 tracking-tight">Canto do Saber</h2>
+                   <p className="text-slate-500 font-medium mt-1">Aprofundamento Teórico Estratégico</p>
+                </div>
+             </div>
+
+             <style>{`
+               .conteudo-teorico h3 { font-size: 2rem; font-weight: 900; color: #0f172a; margin-top: 2.5rem; margin-bottom: 1.25rem; letter-spacing: -0.025em; }
+               .conteudo-teorico h4 { font-size: 1.5rem; font-weight: 800; color: #1e293b; margin-top: 2rem; margin-bottom: 1rem; }
+               .conteudo-teorico p { margin-bottom: 1.5rem; line-height: 1.8; font-size: 1.25rem; color: #1e293b; }
+               .conteudo-teorico ul { list-style-type: disc; padding-left: 2rem; margin-bottom: 1.5rem; color: #1e293b; font-size: 1.25rem; }
+               .conteudo-teorico li { margin-bottom: 0.75rem; line-height: 1.7; }
+               .conteudo-teorico strong { color: #0f172a; font-weight: 900; }
+               /* ESTILO DO MARCA-TEXTO SOLICITADO */
+               .conteudo-teorico mark { background-color: #fef08a; color: #0f172a; padding: 0.1em 0.3em; border-radius: 0.3em; font-weight: 800; box-shadow: 0 1px 2px rgba(0,0,0,0.1); display: inline-block; line-height: 1.2; }
+               .conteudo-teorico > p:first-of-type::first-letter { font-size: 5.5rem; font-weight: 900; float: left; margin-right: 1.25rem; margin-top: 0.2rem; color: #4f46e5; line-height: 0.85; text-shadow: 4px 4px 0px #e0e7ff; }
+             `}</style>
+
+             <div className="conteudo-teorico text-slate-800 text-justify" dangerouslySetInnerHTML={{ __html: lessonData.cantoDoSaber }} />
+          </section>
+
+          <section className="mb-14 bg-slate-900 p-8 md:p-10 rounded-3xl shadow-xl relative overflow-hidden">
+             <div className="absolute -top-10 -right-10 text-indigo-500/20"><Sparkles size={200} strokeWidth={0.5} /></div>
+             <div className="relative z-10">
+                 <h2 className="text-2xl font-black text-white mb-6 flex items-center gap-3">
+                    <Award className="text-amber-400" size={32}/> Cofre de Pérolas
+                    <span className="ml-auto text-xs font-bold uppercase tracking-widest text-indigo-300 bg-indigo-900/50 px-3 py-1 rounded-full border border-indigo-700 hidden sm:block">Decoreba Estratégico</span>
+                 </h2>
+                 <ul className="space-y-4">
+                   {lessonData.cofreDePerolas.map((perola, idx) => (
+                     <li key={idx} className="flex items-start gap-4 bg-slate-800/80 backdrop-blur-sm p-5 rounded-xl border border-slate-700/50">
+                       <CheckCircle2 className="text-amber-400 shrink-0 mt-0.5" size={24} />
+                       <span className="text-slate-200 text-lg font-medium leading-relaxed">{perola}</span>
+                     </li>
+                   ))}
+                 </ul>
+             </div>
+          </section>
+
+          <section>
+             <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+               <div>
+                 <h2 className="text-3xl font-black text-slate-900 flex items-center gap-3 tracking-tight">
+                    <FileText className="text-indigo-600" size={32} /> Praticando para fixar
+                 </h2>
+                 <p className="text-slate-500 font-medium mt-2">15 Questões escalonadas da banca {mockUser.banca}.</p>
+               </div>
+               <div className="flex gap-2">
+                 <span className="text-sm font-bold bg-emerald-100 text-emerald-800 px-4 py-2 rounded-xl">Acertos: {correctCount}</span>
+                 <span className="text-sm font-bold bg-slate-200 text-slate-700 px-4 py-2 rounded-xl">Resp.: {answeredCount}/15</span>
+               </div>
+             </div>
+
+             <div className="space-y-10">
+               {lessonData.questoes.map((q, idx) => (
+                 <QuestionCard key={q.id || idx} question={q} number={idx + 1} onAnswer={(isCorrect, letra) => handleAnswerQuestion(q.id, isCorrect, letra)} />
+               ))}
+             </div>
+             
+             {allAnswered && (
+                <div className="mt-16 bg-white border-2 border-indigo-100 rounded-3xl p-8 shadow-xl">
+                   <div className="text-center mb-8">
+                      <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-4"><Target className="text-indigo-600" size={40} /></div>
+                      <h3 className="text-3xl font-black text-slate-900 mb-2">Treino Finalizado!</h3>
+                      <p className="text-xl font-medium text-slate-600">Você acertou <strong className="text-indigo-600">{correctCount}</strong> de <strong className="text-slate-900">{totalQuestions}</strong> questões.</p>
+                   </div>
+
+                   {!diagnostic && !isGeneratingDiagnostic && (
+                      <button onClick={handleGenerateDiagnostic} className="w-full bg-slate-900 hover:bg-slate-800 text-white p-5 rounded-2xl font-bold text-lg flex items-center justify-center gap-3 transition-all shadow-lg hover:shadow-xl hover:-translate-y-1">
+                         <BrainCircuit size={24} className="text-indigo-400" /> Analisar meu Desempenho com IA
+                      </button>
+                   )}
+
+                   {isGeneratingDiagnostic && (
+                      <div className="flex flex-col items-center justify-center py-8 bg-slate-50 rounded-2xl border border-slate-100">
+                         <Loader2 className="animate-spin text-indigo-600 mb-4" size={40} />
+                         <p className="text-slate-700 font-bold text-lg">Processando suas respostas...</p>
+                         <p className="text-slate-500 text-sm mt-1">Gerando laudo de pontos fortes e fracos.</p>
+                      </div>
+                   )}
+
+                   {diagnostic && (
+                      <div className="bg-slate-50 rounded-2xl p-8 border border-slate-200 mt-4 shadow-inner relative overflow-hidden">
+                         <div className="absolute top-0 left-0 w-2 h-full bg-indigo-600"></div>
+                         <h4 className="text-2xl font-black text-slate-900 mb-6 flex items-center gap-2">
+                           <BrainCircuit className="text-indigo-600" /> Diagnóstico do Mentor
+                         </h4>
+                         
+                         <style>{`
+                           .diagnostico-ia h4 { font-size: 1.25rem; font-weight: 900; color: #0f172a; margin-top: 1.5rem; margin-bottom: 0.5rem; text-transform: uppercase; }
+                           .diagnostico-ia p { color: #334155; margin-bottom: 1rem; line-height: 1.7; font-size: 1.125rem; }
+                           .diagnostico-ia ul { margin-bottom: 1.5rem; }
+                           .diagnostico-ia li { color: #334155; margin-bottom: 0.5rem; position: relative; padding-left: 1.5rem; font-size: 1.125rem; }
+                           .diagnostico-ia li::before { content: '•'; color: #4f46e5; font-weight: bold; position: absolute; left: 0; font-size: 1.5rem; line-height: 1; top: -2px; }
+                           .diagnostico-ia blockquote { margin-top: 2.5rem; padding: 2rem; background: linear-gradient(135deg, #1e293b, #0f172a); color: #fff; border-radius: 1rem; font-size: 1.5rem; font-weight: 800; font-style: italic; text-align: center; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.2); border-left: 6px solid #4f46e5; letter-spacing: -0.02em; line-height: 1.4; }
+                         `}</style>
+                         
+                         <div className="diagnostico-ia" dangerouslySetInnerHTML={{ __html: diagnostic }} />
+                      </div>
+                   )}
+
+                   <div className="flex flex-col sm:flex-row gap-4 mt-8 pt-8 border-t border-slate-100">
+                      <button onClick={() => { const markdown = generateMarkdownContent(lessonData, activeLesson); downloadString(markdown, 'text/markdown', `Aula_${activeLesson.subject.replace(/\s+/g, '_')}.md`); }} className="flex-1 bg-white border-2 border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50 px-6 py-4 rounded-xl font-bold text-lg transition-colors flex items-center justify-center gap-2">
+                          <Download size={24} className="text-slate-400"/> Baixar Resumo
+                      </button>
+                      <button onClick={() => setView('dashboard')} className="flex-1 bg-indigo-600 text-white px-6 py-4 rounded-xl font-bold text-lg shadow-md hover:bg-indigo-700 transition-all flex items-center justify-center gap-2">
+                          Voltar ao Painel <ArrowRight size={20} />
+                      </button>
+                   </div>
+                </div>
+             )}
+          </section>
+
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function QuestionCard({ question, number, onAnswer }) {
+  const [selectedOption, setSelectedOption] = useState(null);
+  const [eliminatedOptions, setEliminatedOptions] = useState([]);
+  
+  const handleEliminate = (e, letra) => {
+    e.stopPropagation(); 
+    if (selectedOption) return; 
+    
+    if (eliminatedOptions.includes(letra)) {
+      setEliminatedOptions(eliminatedOptions.filter(l => l !== letra));
+    } else {
+      setEliminatedOptions([...eliminatedOptions, letra]);
+    }
+  };
+
+  const handleSelect = (letra) => {
+    if (selectedOption) return; 
+    if (eliminatedOptions.includes(letra)) return; // Impede marcar uma opção riscada
+
+    setSelectedOption(letra);
+    const isCorrect = question.opcoes.find(o => o.letra === letra)?.correta;
+    onAnswer(isCorrect, letra);
+  };
+
+  const isAnswered = selectedOption !== null;
+
+  let badgeColor = "bg-emerald-100 text-emerald-800 border-emerald-200";
+  if (question.nivel?.toLowerCase().includes("méd")) badgeColor = "bg-amber-100 text-amber-800 border-amber-200";
+  if (question.nivel?.toLowerCase().includes("dif")) badgeColor = "bg-rose-100 text-rose-800 border-rose-200";
+
+  return (
+    <div className="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-slate-200 transition-all hover:shadow-md">
+      <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
+         <span className="bg-slate-900 text-white font-black w-12 h-12 rounded-xl flex items-center justify-center shrink-0 text-xl shadow-md">{number}</span>
+         {question.nivel && <span className={`text-sm font-black px-4 py-2 rounded-full border ${badgeColor} uppercase tracking-wider shadow-sm`}>Nível: {question.nivel}</span>}
+      </div>
+      
+      <p className="text-slate-900 font-bold text-2xl leading-relaxed mb-8">{question.enunciado}</p>
+
+      <div className="space-y-4">
+        {question.opcoes.map((op) => {
+          const isEliminated = eliminatedOptions.includes(op.letra);
+          const isSelected = selectedOption === op.letra;
+          const showCorrect = isAnswered && op.correta;
+          const showWrong = isAnswered && isSelected && !op.correta;
+
+          let bgClass = "bg-slate-50 border-slate-200 hover:border-indigo-400 hover:bg-indigo-50";
+          let textClass = "text-slate-700";
+          let badgeClass = "bg-white border-slate-300 text-slate-500";
+          let scissorClass = "border-slate-200 bg-white hover:bg-slate-100 text-slate-400 hover:text-slate-600";
+
+          if (isEliminated && !isAnswered) {
+             bgClass = "bg-slate-50 border-slate-200 opacity-70 grayscale cursor-not-allowed";
+             textClass = "text-slate-400 line-through decoration-slate-400 decoration-2";
+             scissorClass = "border-rose-300 bg-rose-100 text-rose-600 hover:bg-rose-200 shadow-inner"; // Tesoura ativada (rosa)
+          } else if (showCorrect) {
+             bgClass = "bg-emerald-50 border-emerald-500 shadow-md ring-2 ring-emerald-500";
+             textClass = "text-emerald-950 font-black";
+             badgeClass = "bg-emerald-500 border-emerald-500 text-white";
+          } else if (showWrong) {
+             bgClass = "bg-rose-50 border-rose-500 ring-2 ring-rose-500";
+             textClass = "text-rose-950 font-black";
+             badgeClass = "bg-rose-500 border-rose-500 text-white";
+          } else if (isAnswered) {
+             bgClass = "bg-slate-50 border-slate-100 opacity-40";
+             textClass = "text-slate-400";
+          }
+
+          return (
+            <div key={op.letra} onClick={() => handleSelect(op.letra)} className={`relative flex items-stretch rounded-2xl border-2 transition-all duration-300 ${isEliminated && !isAnswered ? '' : 'cursor-pointer'} overflow-hidden group ${bgClass}`}>
+              {/* Botão Tesoura */}
+              <div 
+                onClick={(e) => handleEliminate(e, op.letra)}
+                className={`w-16 flex items-center justify-center border-r transition-all duration-300 z-10 cursor-pointer ${isAnswered ? 'hidden' : scissorClass}`}
+                title={isEliminated ? "Restaurar alternativa" : "Eliminar alternativa"}
+              >
+                <Scissors size={24} className={`transition-transform duration-300 ${isEliminated ? 'rotate-180 scale-110' : ''}`} />
+              </div>
+
+              <div className="flex-1 p-5 flex items-start gap-5">
+                <span className={`w-10 h-10 shrink-0 rounded-xl flex items-center justify-center text-lg font-black border-2 shadow-sm ${badgeClass}`}>{op.letra}</span>
+                <span className={`pt-1 text-xl font-medium leading-relaxed ${textClass}`}>{op.texto}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {isAnswered && (
+        <div className={`mt-8 p-8 rounded-3xl border-2 animate-in fade-in slide-in-from-top-4 duration-500 shadow-inner ${selectedOption === question.opcoes.find(o=>o.correta).letra ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`}>
+          <div className="flex items-center gap-4 mb-4 border-b pb-4 border-black/5">
+             {selectedOption === question.opcoes.find(o=>o.correta).letra ? (
+                 <><CheckCircle2 className="text-emerald-600" size={36} /><h4 className="font-black text-2xl text-emerald-950">Na mosca!</h4></>
+             ) : (
+                 <><XCircle className="text-rose-600" size={36} /><h4 className="font-black text-2xl text-rose-950">Quase lá. Atenção ao detalhe!</h4></>
+             )}
+          </div>
+          <div className="text-slate-800 text-xl leading-relaxed">
+            <strong className="text-slate-950 font-black flex items-center gap-2 mb-3 text-2xl">Gabarito Comentado</strong>
+            <p>{question.explicacao}</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function generateMarkdownContent(data, activeLesson) {
+    let md = `# Resumo Dirigido: ${activeLesson.subject}\n\n`;
+    md += `## 📚 Canto do Saber\n\n`;
+    let theory = data.cantoDoSaber
+        .replace(/<h3>/g, '### ').replace(/<\/h3>/g, '\n\n')
+        .replace(/<h4>/g, '#### ').replace(/<\/h4>/g, '\n\n')
+        .replace(/<p>/g, '').replace(/<\/p>/g, '\n\n')
+        .replace(/<ul>/g, '').replace(/<\/ul>/g, '\n')
+        .replace(/<li>/g, '- ').replace(/<\/li>/g, '\n')
+        .replace(/<strong>/g, '**').replace(/<\/strong>/g, '**')
+        .replace(/<mark>/g, '==').replace(/<\/mark>/g, '=='); // Mark vira highlight no MD
+    md += `${theory}\n\n`;
+    md += `## 💎 Cofre de Pérolas\n\n`;
+    data.cofreDePerolas.forEach(p => { md += `- ${p}\n`; });
+    md += `\n## 🎯 Praticando para fixar\n\n`;
+    data.questoes.forEach((q, i) => {
+        md += `**${i+1}. [${q.nivel}] ${q.enunciado}**\n\n`;
+        q.opcoes.forEach(op => { md += `[ ] ${op.letra}) ${op.texto}\n`; });
+        md += `\n`;
+    });
+    md += `## 📝 Gabarito Comentado\n\n`;
+    data.questoes.forEach((q, i) => {
+        const correta = q.opcoes.find(o => o.correta).letra;
+        md += `**Questão ${i+1}: Letra ${correta}**\n${q.explicacao}\n\n`;
+    });
+    return md;
+}
+
+function downloadString(text, fileType, fileName) {
+    const blob = new Blob([text], { type: fileType });
+    const a = document.createElement('a');
+    a.download = fileName;
+    a.href = URL.createObjectURL(blob);
+    a.dataset.downloadurl = [fileType, a.download, a.href].join(':');
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function() { URL.revokeObjectURL(a.href); }, 1500);
+}
